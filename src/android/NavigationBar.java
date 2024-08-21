@@ -165,37 +165,40 @@ public class NavigationBar extends CordovaPlugin {
         return false;
     }
 
-    private void setNavigationBarBackgroundColor(final String colorPref, Boolean lightNavigationBar) {
+private void setNavigationBarBackgroundColor(final String colorPref, Boolean lightNavigationBar) {
+    // Default value for lightNavigationBar if not provided
+    lightNavigationBar = lightNavigationBar == null ? false : lightNavigationBar;
 
-        lightNavigationBar = lightNavigationBar == null ? false : lightNavigationBar;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        final Window window = cordova.getActivity().getWindow();
+        int uiOptions = window.getDecorView().getSystemUiVisibility();
 
-        if (Build.VERSION.SDK_INT >= 21) {
-            if (colorPref != null && !colorPref.isEmpty()) {
-                final Window window = cordova.getActivity().getWindow();
-                int uiOptions = window.getDecorView().getSystemUiVisibility();
-                             
-                // 0x80000000 FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
-                // 0x00000010 SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        // Ensure FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS is set
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 
-                uiOptions = uiOptions | 0x80000000;
-
-                if(Build.VERSION.SDK_INT >= 26 && lightNavigationBar)
-                    uiOptions = uiOptions | 0x00000010;
-                else
-                    uiOptions = uiOptions & ~0x00000010;
-
-                window.getDecorView().setSystemUiVisibility(uiOptions);
-                
-                try {
-                    // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
-                    window.getClass().getDeclaredMethod("setNavigationBarColor", int.class).invoke(window, Color.parseColor(colorPref));
-                } catch (IllegalArgumentException ignore) {
-                    LOG.e(TAG, "Invalid hexString argument, use f.i. '#999999'");
-                } catch (Exception ignore) {
-                    // this should not happen, only in case Android removes this method in a version > 21
-                    LOG.w(TAG, "Method window.setNavigationBarColor not found for SDK level " + Build.VERSION.SDK_INT);
-                }
+        // Handle lightNavigationBar setting for Android O (API 26) and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (lightNavigationBar) {
+                // Set the SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR flag
+                uiOptions |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            } else {
+                // Clear the SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR flag
+                uiOptions &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
             }
         }
+
+        // Apply the UI options
+        window.getDecorView().setSystemUiVisibility(uiOptions);
+
+        try {
+            // Set the navigation bar color
+            window.getClass().getDeclaredMethod("setNavigationBarColor", int.class)
+                    .invoke(window, Color.parseColor(colorPref));
+        } catch (IllegalArgumentException e) {
+            LOG.e(TAG, "Invalid hexString argument, use e.g., '#999999'", e);
+        } catch (Exception e) {
+            LOG.w(TAG, "Method window.setNavigationBarColor not found for SDK level " + Build.VERSION.SDK_INT, e);
+        }
     }
+}
 }
